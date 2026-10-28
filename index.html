@@ -193,6 +193,7 @@ body {
 .leg b { font-size: 1.3rem; font-weight: 900; line-height: 1.1; }
 .leg small { font-size: 0.66rem; font-weight: 700; color: var(--ink-soft); letter-spacing: 0.04em; }
 .leg.on { transform: scale(0.94); border-color: var(--russet); }
+.leg.need { border-color: var(--russet); box-shadow: 0 0 0 3px rgba(184, 100, 44, 0.45), 0 0 18px rgba(232, 150, 70, 0.7); }
 .leg.tired { animation: shake 0.35s linear 2; }
 .leg:focus-visible { outline: 3px solid var(--russet); outline-offset: 2px; }
 @keyframes shake {
@@ -431,13 +432,13 @@ body.cleared .pads { visibility: hidden; }
   <div class="pads">
     <div class="pad">
       <span class="padname">うしろ足</span>
-      <button class="leg glass" id="leg0" data-i="0" aria-label="右うしろ足（E）"><span class="fill"></span><b>E</b><small>右うしろ</small></button>
-      <button class="leg glass" id="leg1" data-i="1" aria-label="左うしろ足（D）"><span class="fill"></span><b>D</b><small>左うしろ</small></button>
+      <button class="leg glass" id="leg0" data-i="0" aria-label="左うしろ足（E）"><span class="fill"></span><b>E</b><small>左うしろ</small></button>
+      <button class="leg glass" id="leg1" data-i="1" aria-label="右うしろ足（D）"><span class="fill"></span><b>D</b><small>右うしろ</small></button>
     </div>
     <div class="pad">
       <span class="padname">まえ足</span>
-      <button class="leg glass" id="leg2" data-i="2" aria-label="右まえ足（I）"><span class="fill"></span><b>I</b><small>右まえ</small></button>
-      <button class="leg glass" id="leg3" data-i="3" aria-label="左まえ足（K）"><span class="fill"></span><b>K</b><small>左まえ</small></button>
+      <button class="leg glass" id="leg2" data-i="2" aria-label="左まえ足（I）"><span class="fill"></span><b>I</b><small>左まえ</small></button>
+      <button class="leg glass" id="leg3" data-i="3" aria-label="右まえ足（K）"><span class="fill"></span><b>K</b><small>右まえ</small></button>
     </div>
   </div>
 </div>
@@ -449,14 +450,14 @@ body.cleared .pads { visibility: hidden; }
     <ul class="rules">
       <li><span>連</span><span>押すたびに、その足がぐっとのびる</span></li>
       <li><span>放</span><span>ほうっておくと、体の重さで曲がっていく</span></li>
-      <li><span>傾</span><span>かたむいたら、低いほうの足を多めに連打</span></li>
+      <li><span>光</span><span>光っているボタンが、いま押すとよい足</span></li>
       <li><span>疲</span><span>連打しすぎた足はつかれて、がくっとなる</span></li>
       <li><span>3</span><span>ぐらつかずに3秒立てたら成功</span></li>
     </ul>
     <div class="keys">
-      <div><span>うしろ足</span><div class="grid"><kbd>E</kbd><span>右</span><kbd>D</kbd><span>左</span></div></div>
-      <div class="mid">上の段が奥の足<br>スマホは左下・右下のボタン</div>
-      <div><span>まえ足</span><div class="grid"><kbd>I</kbd><span>右</span><kbd>K</kbd><span>左</span></div></div>
+      <div><span>うしろ足</span><div class="grid"><kbd>E</kbd><span>左</span><kbd>D</kbd><span>右</span></div></div>
+      <div class="mid">子鹿から見た左右<br>手前が右足・奥が左足</div>
+      <div><span>まえ足</span><div class="grid"><kbd>I</kbd><span>左</span><kbd>K</kbd><span>右</span></div></div>
     </div>
     <button class="go" id="startBtn">はじめる</button>
     <button class="link" id="rankBtn">ランキングを見る</button>
@@ -500,12 +501,12 @@ body.cleared .pads { visibility: hidden; }
   "use strict";
   const $ = (s) => document.querySelector(s);
 
-  /* ---------- 足の定義（0:右うしろ 1:左うしろ 2:右まえ 3:左まえ） ---------- */
+  /* ---------- 足の定義（0:左うしろ 1:右うしろ 2:左まえ 3:右まえ。子鹿は+x向きなので、子鹿の右は手前の+z＝side 1） ---------- */
   const LEGS = [
-    { code: "KeyE", label: "右うしろ", front: -1, side: -1 },
-    { code: "KeyD", label: "左うしろ", front: -1, side: 1 },
-    { code: "KeyI", label: "右まえ", front: 1, side: -1 },
-    { code: "KeyK", label: "左まえ", front: 1, side: 1 }
+    { code: "KeyE", label: "左うしろ", front: -1, side: -1 },
+    { code: "KeyD", label: "右うしろ", front: -1, side: 1 },
+    { code: "KeyI", label: "左まえ", front: 1, side: -1 },
+    { code: "KeyK", label: "右まえ", front: 1, side: 1 }
   ];
   const HIP_X = 0.24, HIP_Y = -0.07, HIP_Z = 0.085;
   const SEG = 0.3;
@@ -514,7 +515,7 @@ body.cleared .pads { visibility: hidden; }
   const STAND_GOAL = 3;
   const TUNE = {
     strLo: 0.8, strHi: 1.2, drift: 0.06, G: 14, loadSide: 2, loadFront: 2.0, fallRoll: 0.55, fallPitch: 0.6,
-    tap: 0.11, push: 1.8, sagBase: 0.08, sagLoad: 0.4, tapFat: 0.035, fatDecay: 0.12,
+    tap: 0.2, push: 1.8, sagBase: 0.04, sagLoad: 0.3, tapFat: 0.035, fatDecay: 0.12,
     standE: 0.62, standRoll: 0.2, standPitch: 0.22, standDecay: 0.6
   };
 
@@ -1217,7 +1218,17 @@ body.cleared .pads { visibility: hidden; }
       fill.style.transform = "scaleY(" + l.x.toFixed(3) + ")";
       const hue = 95 - l.fat * 85;
       fill.style.setProperty("--fc", "hsl(" + hue.toFixed(0) + ", 55%, 52%)");
+      legBtns[i].classList.toggle("need", legNeed(i));
     });
+  }
+
+  /* 押すとよい足：低くなった側・のびていない足。つかれた足は休ませる */
+  function legNeed(i) {
+    if (S.phase !== "play") return false;
+    const L = LEGS[i], l = S.legs[i];
+    if (l.buckle > 0 || l.fat > 0.85) return false;
+    const tgt = Math.max(0.4, Math.min(0.95, 0.8 - 2.2 * (L.side * S.roll + L.front * S.pitch)));
+    return l.x < tgt - 0.06;
   }
 
   const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1233,7 +1244,7 @@ body.cleared .pads { visibility: hidden; }
   }
   requestAnimationFrame(loop);
 
-  window.__kojika = { S, LEGS, TUNE, start, cam, camera, tap, step };
+  window.__kojika = { S, LEGS, TUNE, start, cam, camera, tap, step, legNeed };
 })();
 </script>
 
