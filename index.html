@@ -447,10 +447,10 @@ body.cleared .pads { visibility: hidden; }
     <h1>たって、<em>こじか</em></h1>
     <p>うまれたばかりの子鹿。4本の足をうまく使って、立たせてあげよう。</p>
     <ul class="rules">
-      <li><span>押</span><span>押しているあいだ、その足がのびる</span></li>
-      <li><span>離</span><span>はなすと、体の重さで曲がっていく</span></li>
-      <li><span>傾</span><span>かたむいたら、低いほうの足を押してささえる</span></li>
-      <li><span>疲</span><span>押しっぱなしの足はつかれて、がくっとなる</span></li>
+      <li><span>連</span><span>押すたびに、その足がぐっとのびる</span></li>
+      <li><span>放</span><span>ほうっておくと、体の重さで曲がっていく</span></li>
+      <li><span>傾</span><span>かたむいたら、低いほうの足を多めに連打</span></li>
+      <li><span>疲</span><span>連打しすぎた足はつかれて、がくっとなる</span></li>
       <li><span>3</span><span>ぐらつかずに3秒立てたら成功</span></li>
     </ul>
     <div class="keys">
@@ -512,7 +512,10 @@ body.cleared .pads { visibility: hidden; }
   const HIP_REST = 0.13, HIP_STAND = 0.56, BODY_OFF = 0.07;
   const W_EFF = 0.3, L_EFF = 0.5;
   const STAND_GOAL = 3;
-  const TUNE = { strLo: 0.62, strHi: 1.38, drift: 0.1, G: 26, loadSide: 3, loadFront: 2.0, fallRoll: 0.4, fallPitch: 0.48 };
+  const TUNE = {
+    strLo: 0.62, strHi: 1.38, drift: 0.1, G: 26, loadSide: 3, loadFront: 2.0, fallRoll: 0.4, fallPitch: 0.48,
+    tap: 0.11, push: 1.8, sagBase: 0.08, sagLoad: 0.6, tapFat: 0.035, fatDecay: 0.12
+  };
 
   /* ---------- 状態 ---------- */
   const S = {
@@ -524,7 +527,7 @@ body.cleared .pads { visibility: hidden; }
   const rnd = (a, b) => a + Math.random() * (b - a);
   function newLeg() {
     return {
-      x: 0, e: 0, fat: 0, buckle: 0, held: false, key: false, ptr: new Set(),
+      x: 0, e: 0, fat: 0, buckle: 0, boost: 0, load: 0.25,
       str: rnd(TUNE.strLo, TUNE.strHi), p1: rnd(0, 7), p2: rnd(0, 7), p3: rnd(0, 7), p4: rnd(0, 7), n: 0
     };
   }
@@ -532,7 +535,6 @@ body.cleared .pads { visibility: hidden; }
     S.legs = LEGS.map((_, i) => {
       const old = S.legs[i];
       const l = newLeg();
-      if (old) { l.key = old.key; l.ptr = old.ptr; }
       return l;
     });
   }
@@ -825,11 +827,29 @@ body.cleared .pads { visibility: hidden; }
 
   /* ---------- 入力 ---------- */
   const legBtns = [0, 1, 2, 3].map((i) => $("#leg" + i));
-  function refreshHeld(i) {
+  const flashT = [0, 0, 0, 0];
+  function tap(i) {
+    const btn = legBtns[i];
+    btn.classList.add("on");
+    clearTimeout(flashT[i]);
+    flashT[i] = setTimeout(() => btn.classList.remove("on"), 90);
+    if (S.phase !== "play") return;
+    if (!S.timing) S.timing = true;
     const l = S.legs[i];
-    l.held = l.key || l.ptr.size > 0;
-    legBtns[i].classList.toggle("on", l.held);
-    if (l.held && S.phase === "play" && !S.timing) S.timing = true;
+    if (l.buckle > 0) return;
+    const d = TUNE.tap * l.str * (1 - 0.45 * l.fat) * Math.max(0.15, 1.5 - 2 * l.load);
+    l.boost = Math.min(0.35, l.boost + d);
+    l.fat += TUNE.tapFat;
+    if (l.fat >= 1) {
+      l.fat = 1;
+      l.boost = 0;
+      l.buckle = 0.7;
+      btn.classList.remove("tired");
+      void btn.offsetWidth;
+      btn.classList.add("tired");
+      toast("がくっ…");
+      thud(0.25);
+    }
   }
   const typing = (e) => e.target && e.target.tagName === "INPUT";
   window.addEventListener("keydown", (e) => {
@@ -837,7 +857,7 @@ body.cleared .pads { visibility: hidden; }
     const i = LEGS.findIndex((L) => L.code === e.code);
     if (i >= 0) {
       e.preventDefault();
-      if (!S.legs[i].key) { S.legs[i].key = true; refreshHeld(i); }
+      if (!e.repeat) tap(i);
       return;
     }
     if ((e.code === "Space" || e.code === "Enter") && !e.repeat) {
@@ -845,26 +865,12 @@ body.cleared .pads { visibility: hidden; }
       else if (S.phase === "clear" && !$("#clearView").hidden && $("#entry").hidden) { e.preventDefault(); start(); }
     }
   });
-  window.addEventListener("keyup", (e) => {
-    if (typing(e)) return;
-    const i = LEGS.findIndex((L) => L.code === e.code);
-    if (i >= 0) { S.legs[i].key = false; refreshHeld(i); }
-  });
   legBtns.forEach((btn, i) => {
     btn.addEventListener("pointerdown", (e) => {
       e.preventDefault();
-      btn.setPointerCapture(e.pointerId);
-      S.legs[i].ptr.add(e.pointerId);
-      refreshHeld(i);
+      tap(i);
     });
-    const up = (e) => { S.legs[i].ptr.delete(e.pointerId); refreshHeld(i); };
-    btn.addEventListener("pointerup", up);
-    btn.addEventListener("pointercancel", up);
-    btn.addEventListener("lostpointercapture", up);
     btn.addEventListener("contextmenu", (e) => e.preventDefault());
-  });
-  window.addEventListener("blur", () => {
-    S.legs.forEach((l, i) => { l.key = false; l.ptr.clear(); refreshHeld(i); });
   });
 
   /* ---------- 画面 ---------- */
@@ -895,7 +901,6 @@ body.cleared .pads { visibility: hidden; }
     $("#rankView").hidden = true;
     $("#clearView").hidden = true;
     document.body.classList.remove("cleared");
-    S.legs.forEach((_, i) => refreshHeld(i));
   }
   $("#startBtn").addEventListener("click", start);
   $("#againBtn").addEventListener("click", start);
@@ -1006,31 +1011,23 @@ body.cleared .pads { visibility: hidden; }
     const sr = Math.sin(S.roll), sp = Math.sin(S.pitch);
     for (let i = 0; i < 4; i++) {
       const L = LEGS[i], l = S.legs[i];
-      const load = Math.max(0.04, Math.min(0.75, 0.25 * (1 - TUNE.loadSide * L.side * sr - TUNE.loadFront * L.front * sp)));
+      const load = l.load = Math.max(0.04, Math.min(0.75, 0.25 * (1 - TUNE.loadSide * L.side * sr - TUNE.loadFront * L.front * sp)));
       l.n = 0.5 * Math.sin(S.t * 11 + l.p1) + 0.3 * Math.sin(S.t * 6.3 + l.p2) + 0.2 * Math.sin(S.t * 17.7 + l.p3);
       if (S.phase === "play") {
         if (l.buckle > 0) {
           l.buckle -= dt;
           l.x = Math.max(0, l.x - dt * 1.6);
           l.fat = Math.max(0.55, l.fat - dt * 0.4);
-        } else if (l.held) {
-          const reach = (1 - TUNE.drift) + TUNE.drift * Math.sin(S.t * 0.7 + l.p4) - 0.25 * l.fat;
-          const v = 0.72 * l.str * (1 - 0.45 * l.fat) * Math.max(0.15, 1.5 - 2 * load);
-          if (l.x < reach) l.x = Math.min(reach, l.x + v * dt);
-          else l.x -= (l.x - reach) * 2 * dt;
-          l.fat += dt * 0.13;
-          if (l.fat >= 1) {
-            l.fat = 1;
-            l.buckle = 0.7;
-            legBtns[i].classList.remove("tired");
-            void legBtns[i].offsetWidth;
-            legBtns[i].classList.add("tired");
-            toast("がくっ…");
-            thud(0.25);
-          }
         } else {
-          l.x = Math.max(0, l.x - dt * (0.15 + 0.9 * load * l.x));
-          l.fat = Math.max(0, l.fat - dt * 0.3);
+          const reach = (1 - TUNE.drift) + TUNE.drift * Math.sin(S.t * 0.7 + l.p4) - 0.25 * l.fat;
+          if (l.boost > 0) {
+            const d = Math.min(l.boost, dt * TUNE.push);
+            l.boost -= d;
+            if (l.x < reach) l.x = Math.min(reach, l.x + d);
+          }
+          if (l.x > reach) l.x -= (l.x - reach) * 2 * dt;
+          l.x = Math.max(0, l.x - dt * (TUNE.sagBase + TUNE.sagLoad * load * l.x));
+          l.fat = Math.max(0, l.fat - dt * TUNE.fatDecay);
         }
         const A = 0.012 + 0.045 * l.x * l.x + 0.08 * l.fat * l.fat;
         l.e = Math.max(0, Math.min(1, l.x + A * l.n));
@@ -1105,7 +1102,6 @@ body.cleared .pads { visibility: hidden; }
       S.y = S.fromY + (HIP_REST + BODY_OFF - S.fromY) * k;
       if (u >= 1) {
         resetLegs();
-        S.legs.forEach((_, i) => refreshHeld(i));
         S.roll = 0; S.rollV = 0; S.pitch = 0; S.pitchV = 0;
         S.phase = "play";
       }
@@ -1236,7 +1232,7 @@ body.cleared .pads { visibility: hidden; }
   }
   requestAnimationFrame(loop);
 
-  window.__kojika = { S, LEGS, TUNE, start, cam, camera, press(i, on) { S.legs[i].key = !!on; refreshHeld(i); }, step };
+  window.__kojika = { S, LEGS, TUNE, start, cam, camera, tap, step };
 })();
 </script>
 
