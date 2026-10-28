@@ -385,11 +385,19 @@ body.cleared .pads { visibility: hidden; }
   .card h1 { font-size: 1.8rem; }
   .rules { font-size: 0.8rem; gap: 2px; }
   .padname { display: none; }
+  #startView .card { width: min(580px, 100%); }
+  #startView .card > p { display: none; }
+  #startView .rules { grid-template-columns: 1fr 1fr; column-gap: 16px; }
+  .keys .mid { display: none; }
+  .go { padding: 10px; }
 }
 @media (max-height: 460px) and (min-aspect-ratio: 13/10) {
   .overlay.result { justify-items: start; align-items: center; }
   .result .card { width: min(300px, 46vw); }
   #clearMsg { display: none; }
+}
+@media (max-height: 380px) {
+  .keys { display: none; }
 }
 @media (max-width: 520px) {
   .meter { width: 100%; }
