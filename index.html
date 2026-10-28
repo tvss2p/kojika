@@ -513,8 +513,9 @@ body.cleared .pads { visibility: hidden; }
   const W_EFF = 0.3, L_EFF = 0.5;
   const STAND_GOAL = 3;
   const TUNE = {
-    strLo: 0.62, strHi: 1.38, drift: 0.1, G: 26, loadSide: 3, loadFront: 2.0, fallRoll: 0.4, fallPitch: 0.48,
-    tap: 0.11, push: 1.8, sagBase: 0.08, sagLoad: 0.6, tapFat: 0.035, fatDecay: 0.12
+    strLo: 0.8, strHi: 1.2, drift: 0.06, G: 14, loadSide: 2, loadFront: 2.0, fallRoll: 0.55, fallPitch: 0.6,
+    tap: 0.11, push: 1.8, sagBase: 0.08, sagLoad: 0.4, tapFat: 0.035, fatDecay: 0.12,
+    standE: 0.62, standRoll: 0.2, standPitch: 0.22, standDecay: 0.6
   };
 
   /* ---------- 状態 ---------- */
@@ -1066,8 +1067,8 @@ body.cleared .pads { visibility: hidden; }
         S.standT = 0;
         toast("ころん…");
       } else {
-        const ok = S.legs.every((l) => l.e >= 0.7) && Math.abs(S.roll) < 0.14 && Math.abs(S.pitch) < 0.16;
-        S.standT = ok ? S.standT + dt : Math.max(0, S.standT - dt * 1.5);
+        const ok = S.legs.every((l) => l.e >= TUNE.standE) && Math.abs(S.roll) < TUNE.standRoll && Math.abs(S.pitch) < TUNE.standPitch;
+        S.standT = ok ? S.standT + dt : Math.max(0, S.standT - dt * TUNE.standDecay);
         if (S.standT >= STAND_GOAL) {
           S.standT = STAND_GOAL;
           S.phase = "clear";
